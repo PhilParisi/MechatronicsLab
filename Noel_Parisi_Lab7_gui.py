@@ -34,9 +34,6 @@ def startTask():
 	stopTask_button.configure(state = 'normal')
 	moveRight_button.configure(state = 'normal')
 	moveLeft_button.configure(state = 'normal')
-	
-    # MORE CODE HERE
-	command_char = 'a'
 
 
 def stopTask():
@@ -205,11 +202,7 @@ while True:
 	main.update()
 	
 	# Control Code Here [JASON!]
-	
-	
-	
-	
-	
+
 	# Sanity Check
 	print("hello world")
 	time.sleep(0.1)
