@@ -1,5 +1,5 @@
 // Jason Noel & Phil Parisi - Mechatronics Final Project
-
+   
 // Commands
 
 // 'z' --> null state (does nothing, holds current state)
@@ -20,8 +20,8 @@ byte state7Entry = false;  // 7 --> autonomous mode
 #define bridgeForwardRight 2  // (Hbridge connection 4A)
 #define bridgeBackwardRight 4  // (Hbridge connection 3A)
 #define bridgeForwardLeft 8  // (Hbridge connection 1A)
-#define brdigeBackwardLeft 7  // (Hbridge connection 2A)
-#define brdigePWM 9 //PWM pin (Hbridge connection 1,2EN and 3,4EN)
+#define bridgeBackwardLeft 7  // (Hbridge connection 2A)
+#define bridgePWM 9 //PWM pin (Hbridge connection 1,2EN and 3,4EN)
 
 #define LED1 5 //PWM pin
 #define LED2 6 //PWM pin              
@@ -48,11 +48,18 @@ unsigned long startTime;  // Variable to record starting time
 float turnTime;
 float stateTime;
 float serialTime;
+long objectDistance;
 
 // Function Declarations  (Prototypes)
 void controlTask(void);         // Task state transition diagram function
+void controlHbridgePWM();
 unsigned long getTimeNow(void);  // Returns time in ms units
 long sensorPing(void);          // for using the foward-looking sensor
+void motorSetSpeed(int val);
+void turnLeft();
+void turnRight();
+void moveForward();
+void moveBackward();
 
 // Setup Function
 void setup() {
@@ -66,9 +73,9 @@ void setup() {
   digitalWrite(LED2, LOW);
 
   // H-Bridge Pin Setup
-  pinMode(bridgeFowardRight, OUTPUT);
+  pinMode(bridgeForwardRight, OUTPUT);
   pinMode(bridgeBackwardRight, OUTPUT);
-  pinMode(bridgeFowardLeft, OUTPUT);
+  pinMode(bridgeForwardLeft, OUTPUT);
   pinMode(bridgeBackwardRight, OUTPUT);
   
   // Ultrasonic Sensor Setup
@@ -104,12 +111,13 @@ void loop() {
 
 
   // Tasks for Every Loop
-	objectDistance = sensorPing()  // object avoidance not implemented yet
-	Serial.print(objectDistance); // send sensor reading back to GUI
+	objectDistance = sensorPing();  // object avoidance not implemented yet
+	Serial.print(command); // send sensor reading back to GUI
+  Serial.print(state);
   controlTask(); //  Call ControlTask 1
   controlHbridgePWM(); // allow commands sent from GUI to update the PWM signal for hbridge
   
-  command = 'z';   // reset this so commands are executed only once
+  //command = 'z';   // reset this so commands are executed only once
   }
 }
 
@@ -186,7 +194,7 @@ void controlTask(void) {
 		
       }
 
-      if (Command == 's')  // Stop Task!
+      if (command == 's')  // Stop Task!
       {
         nextState = 1;        // get into state 0
         state2Entry = false;  // get out of state 2
@@ -211,7 +219,7 @@ void controlTask(void) {
     
       }
 
-      if (Command == 's')  // stop
+      if (command == 's')  // stop
       {
         nextState = 1;        // get into state 0
         state3Entry = false;  // get out of state 2
@@ -239,7 +247,7 @@ void controlTask(void) {
       {
         nextState = 1;
         state4Entry = false;  // get out of state 5
-        driveFoward();
+        driveForward();
       }
 
       if (command == 'l')   // turn left
@@ -336,25 +344,25 @@ void turnLeft()
   digitalWrite(bridgeBackwardRight, LOW);
 
   digitalWrite(bridgeForwardLeft, LOW); // left side backward
-  digitalWrite(bridgeBackwardLeft, HGIH);
+  digitalWrite(bridgeBackwardLeft, HIGH);
 }
 
 void controlHbridgePWM()
 {
-  if (command == 'x') // slow
+  if (command == '1') // slow
   {
     motorSetSpeed(slowMotorPWM);
   }
-  if (command == 'y') // fast
+  if (command == '2') // fast
   {
     motorSetSpeed(fastMotorPWM);
   }
 }
 
 
-void motorSetSpeed()
+void motorSetSpeed(int val)
 {
-  analogWrite(brdigePWM, val);
+  analogWrite(bridgePWM, val);
 }
 
 long sensorPing(void) // returns distance in cm from ultrasonic sensor
@@ -375,5 +383,5 @@ long sensorPing(void) // returns distance in cm from ultrasonic sensor
   //Serial.print(distance);
   //Serial.println(" cm");// working  code for aj-sr04m
   
-  return distance
+  return distance;
 }

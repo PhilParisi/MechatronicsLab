@@ -12,7 +12,10 @@
     # s --> stop
 	# a --> autonomous
     # z --> null
-    
+
+# Other Parameters to Pass to Arudino
+	# 1 --> 'slow' speed mode (send as CHAR not int)
+	# 2 --> 'fast' speed mode (send as CHAR not int)
 
 ############### PACKAGES
 
@@ -24,14 +27,14 @@ import time
 ############### SETUP
 
 # Arduino Setup
-#arduino = serial.Serial(port='COM3', baudrate=38400, timeout=0.05)
-#valBytes = bytes('z','utf-8')       #Convert to bytes
-#arduino.write(valBytes)
+arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.05)
+valBytes = bytes('z','utf-8')       #Convert to bytes
+arduino.write(valBytes)
 
 # Default Values 
 commandChar = 'z' #Command to switch states DEFAULT "OFF" = 'a'
 progMode = 'manual' # 2 modes: 'manual' and 'auto'
-currentSpeed = 'slow' # 2 levels: 'slow' and 'fast'
+currentSpeed = '1' # 2 levels: 'slow' = '1' and 'fast' = '2'
 
 
 ############### FUNCTIONS
@@ -63,6 +66,7 @@ def initialize():
 		
 	# Update Command
 	commandChar = 'i'
+	pyToSerial(commandChar)
 	
 	# Infinite While Loop
 	runMainLoop()
@@ -77,6 +81,7 @@ def stop():
 	
 	# Update Command
 	commandChar = 's'
+	pyToSerial(commandChar)
 	
 	if progMode == "auto":
 		manualModeRadio.select()
@@ -91,6 +96,7 @@ def moveForward():
 	
 	# Update Command
 	commandChar = 'f'	
+	pyToSerial(commandChar)
 
 def moveBackward():
 	global commandChar
@@ -100,7 +106,8 @@ def moveBackward():
 	writeTextReadOnly(outMsg, motionBox)   
 	
 	# Update Command
-	commandChar = 'b'	
+	commandChar = 'b'
+	pyToSerial(commandChar)	
 	
   
 def turnRight():
@@ -112,6 +119,7 @@ def turnRight():
 	
 	# Update Command
 	commandChar = 'r'
+	pyToSerial(commandChar)
 
         
 def turnLeft():
@@ -123,6 +131,7 @@ def turnLeft():
 	
 	# Update Command
 	commandChar = 'l'
+	pyToSerial(commandChar)
   
 
 def exitApp():
@@ -152,17 +161,20 @@ def updateSpeed():
 	global globalTimePWM	
 	global currentSpeed
 	
-	if radioSpeed.get() == "slow":
-		currentSpeed = 'slow'
-	elif radioSpeed.get() == "fast":
-		currentSpeed = 'fast'
+	radioVal = radioSpeed.get()
+	
+	if radioVal == "slow":
+		currentSpeed = '1' 
+	elif radioVal == "fast":
+		currentSpeed = '2'
 	else:
-		currentSpeed = 'slow' # default to slowest speed
+		currentSpeed = '1' # default to slowest speed
 	
 	globalTimePWM = time.time()
 	
-	outMsg = "Speed: " + str(currentSpeed);
+	outMsg = "Speed: " + str(radioVal)
 	writeTextReadOnly(outMsg, speedBox)
+	pyToSerial(currentSpeed) # send '1' or '2' to arduino
 	
 def setDefaultsGUI():
 	global globalTimePWM
@@ -242,7 +254,13 @@ def setAllGUIFeatures(commandToGUI):
 	slowSpeedRadio.configure(state = val)
 	fastSpeedRadio.configure(state = val)
 	
-		
+
+def pyToSerial(val):
+    val_bytes = bytes(val,'utf-8')       #Convert to bytes
+    arduino.write(val_bytes)                  #Send to arduino 
+    print('The encoded value sent to Arduino is: ' + str(val_bytes))
+    time.sleep(0.05)               #Delay to allow for transmission
+    	
 
 def runMainLoop():
 	counter = 0
