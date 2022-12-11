@@ -1,9 +1,7 @@
 // Jason Noel & Phil Parisi - Mechatronics Final Project
    
-// Commands
 
 // 'z' --> null state (does nothing, holds current state)
-
 
 // States
 byte state0Entry = false;  // 0 --> 'dead' (system off)
@@ -28,11 +26,14 @@ byte state7Entry = false;  // 7 --> autonomous mode
 #define echoPin 11 // attach pin D2 Arduino to pin Echo of JSN-SR04T (PWM)
 #define trigPin 12 //attach pin D3 Arduino to pin Trig of JSN-SR04T
 
-#define slowMotorPWM 500  // these probably need adjustment based on what it takes to move the motors
-#define fastMotorPWM 1023
+#define slowMotorPWM 180  // these probably need adjustment based on what it takes to move the motors
+#define fastMotorPWM 255
 
 #define serialCheckTimeInterval 50  // time in ms
 #define turnTimeInterval 1000 // time in ms NEEDS TO BE TUNED
+
+#define minimumSensorDistance 25  // 25cm stopping distance
+#define maxSensorHits 10
 
 // Mutable 'Global Variables'
 byte state;  // State and NextState of 1st task transition diagram
@@ -50,6 +51,8 @@ float stateTime;
 float serialTime;
 long objectDistance;
 
+int sensorHitCounter; // for counting when the sensors records values that are 'too close'
+
 // Function Declarations  (Prototypes)
 void controlTask(void);         // Task state transition diagram function
 void controlHbridgePWM();
@@ -60,6 +63,7 @@ void turnLeft();
 void turnRight();
 void moveForward();
 void moveBackward();
+void objectAvoidance(int distance);
 
 // Setup Function
 void setup() {
@@ -77,6 +81,8 @@ void setup() {
   pinMode(bridgeBackwardRight, OUTPUT);
   pinMode(bridgeForwardLeft, OUTPUT);
   pinMode(bridgeBackwardRight, OUTPUT);
+  pinMode(bridgePWM, OUTPUT);
+  motorSetSpeed(slowMotorPWM); // default to slow motor speed
   
   // Ultrasonic Sensor Setup
   pinMode(trigPin, OUTPUT); // Sets the trigPin as an OUTPUT
@@ -111,13 +117,13 @@ void loop() {
 
 
   // Tasks for Every Loop
-	objectDistance = sensorPing();  // object avoidance not implemented yet
-	Serial.print(command); // send sensor reading back to GUI
-  Serial.print(state);
-  controlTask(); //  Call ControlTask 1
-  controlHbridgePWM(); // allow commands sent from GUI to update the PWM signal for hbridge
+  controlTask(); //  Call ControlTask 1 (looks for commands of the letter format like 's' 'f' 'b')
+  controlHbridgePWM(); // allow commands sent from GUI to update the PWM signal for hbridge (commands of the form '1' for slow and '2' for fast)
+  objectDistance = sensorPing();  // ultrasonic sensor sends pings, returns distance to nearest object [centimeters!]
+  //objectAvoidance(objectDistance);
   
-  //command = 'z';   // reset this so commands are executed only once
+  // Reset command
+  command = 'z';   // reset this so commands are executed only once
   }
 }
 
@@ -135,6 +141,7 @@ void controlTask(void) {
       if (state0Entry == false)  // if not in the state, get in it!
       {
         state0Entry = true;
+        stopMotors();
       }
 
       if (command == 'i')  // 'initialize', move to State 1! 
@@ -152,17 +159,19 @@ void controlTask(void) {
       if (state1Entry == false)  // if not in the state, get in it!
       {
         state1Entry = true;  // we are in state 1
-		// stop motors
+        stopMotors();
       }
 
       if (command == 'l')  // 'left', move to state 2 (turn left)
       {
+        returnToState = 1;
         nextState = 2;                
         state1Entry = false;         
       }
 
       if (command == 'r')  // 'right', move to state 3 (turn right)
       {
+        returnToState = 1;
         nextState = 3;        
         state1Entry = false;  
       }
@@ -186,17 +195,14 @@ void controlTask(void) {
 	
       if (state2Entry == false)  // if not in the state, get into it
       {
-        returnToState = state;
 		    turnTime = getTimeNow();
         state2Entry = true;
-		    
-		    // start turning left (send mototor commands)
-		
+		    turnLeft();
       }
 
       if (command == 's')  // Stop Task!
       {
-        nextState = 1;        // get into state 0
+        nextState = 1;        // get into state 1
         state2Entry = false;  // get out of state 2
       }
 
@@ -211,12 +217,9 @@ void controlTask(void) {
     case 3: // turn right 90deg                         
       if (state3Entry == false)  // if not in the state, get into it
       {
-        returnToState = state;
         turnTime = getTimeNow();
         state3Entry = true;
-        
-        // start turning right (send mototor commands)
-    
+        turnRight();
       }
 
       if (command == 's')  // stop
@@ -238,28 +241,33 @@ void controlTask(void) {
       if (state4Entry == false)  // if not in the state, get into it
       {
         state4Entry = true;
-
-        // send motor commands to drive forward
-        
+        driveForward();
       }
 
       if (command == 's')   // stop
       {
         nextState = 1;
-        state4Entry = false;  // get out of state 5
-        driveForward();
+        state4Entry = false;  // get out of state 4
       }
 
       if (command == 'l')   // turn left
       {
-        nextState = 2;
-        state4Entry = false;  // get out of state 5
+        returnToState = 4; // come back to driving forward
+        nextState = 2; // turn left
+        state4Entry = false;  // get out of state 4
       }
 
       if (command == 'r')   // turn right
       {
+        returnToState = 4; // come back to driving forward
         nextState = 3;
-        state4Entry = false;  // get out of state 5
+        state4Entry = false;  // get out of state 4
+      }
+
+      if (command == 'b')   // go backwards
+      {
+        nextState = 5;
+        state4Entry = false;
       }
 
       break;
@@ -269,27 +277,33 @@ void controlTask(void) {
       if (state5Entry == false)  // if not in the state, get into it
       {
         state5Entry = true;
-
-        // send motor commands to drive forward
-        
+        driveBackward();
       }
 
       if (command == 's')   // stop
       {
         nextState = 1;
-        state4Entry = false;  // get out of state 5
+        state5Entry = false;  // get out of state 5
       }
 
       if (command == 'l')   // turn left
       {
+        returnToState = 5;
         nextState = 2;
-        state4Entry = false;  // get out of state 5
+        state5Entry = false;  // get out of state 5
       }
 
       if (command == 'r')   // turn right
       {
+        returnToState = 5;
         nextState = 3;
-        state4Entry = false;  // get out of state 5
+        state5Entry = false;  // get out of state 5
+      }
+
+      if (command == 'f')   // go forwards
+      {
+        nextState = 4;
+        state5Entry = false;
       }
 
       break;
@@ -327,9 +341,9 @@ void driveBackward()
   digitalWrite(bridgeBackwardLeft, HIGH);
 }
 
-void turnRight()
+void turnLeft()
 {
-  // to turn right...
+  // to turn left...
   digitalWrite(bridgeForwardRight, LOW); // right side backward
   digitalWrite(bridgeBackwardRight, HIGH);
 
@@ -337,14 +351,24 @@ void turnRight()
   digitalWrite(bridgeBackwardLeft, LOW);
 }
 
-void turnLeft()
+void turnRight()
 {
-  // to turn left...
+  // to turn right...
   digitalWrite(bridgeForwardRight, HIGH); // right side foward
   digitalWrite(bridgeBackwardRight, LOW);
 
   digitalWrite(bridgeForwardLeft, LOW); // left side backward
   digitalWrite(bridgeBackwardLeft, HIGH);
+}
+
+void stopMotors()
+{
+  // to stop motors...
+  digitalWrite(bridgeForwardRight, LOW); // right side backward
+  digitalWrite(bridgeBackwardRight, LOW);
+
+  digitalWrite(bridgeForwardLeft, LOW); // left side backward
+  digitalWrite(bridgeBackwardLeft, LOW);
 }
 
 void controlHbridgePWM()
@@ -384,4 +408,25 @@ long sensorPing(void) // returns distance in cm from ultrasonic sensor
   //Serial.println(" cm");// working  code for aj-sr04m
   
   return distance;
+}
+
+void objectAvoidance(int distance)
+{
+  // to account for noise, we have to count up to maxSensorHits in a row before stopping!
+  if (distance <= minimumSensorDistance)
+  {
+    sensorHitCounter = sensorHitCounter + 1;
+  } 
+  else 
+  {
+    sensorHitCounter = 0;
+  }
+
+  // send to 'stop' state 1 if we go above our max limit
+  if (sensorHitCounter >= maxSensorHits)
+  {
+    nextState = 1; // send program to 'stop' because we're too close!
+    sensorHitCounter = 0; 
+  }
+
 }

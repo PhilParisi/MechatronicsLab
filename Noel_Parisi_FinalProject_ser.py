@@ -27,7 +27,7 @@ import time
 ############### SETUP
 
 # Arduino Setup
-arduino = serial.Serial(port='COM4', baudrate=9600, timeout=0.05)
+arduino = serial.Serial(port='COM5', baudrate=9600, timeout=0.05)
 valBytes = bytes('z','utf-8')       #Convert to bytes
 arduino.write(valBytes)
 
@@ -136,8 +136,9 @@ def turnLeft():
 
 def exitApp():
 	# Stop the Motor	
-
-
+	commandChar = 's'
+	pyToSerial(commandChar)
+ 
 	# Quit Application
 	#main.quit(),#main.after(1000,lambda:main.destroy())
 	main.destroy()
@@ -157,11 +158,10 @@ def updateSpeed():
 	# when the radio button for speed is changed, this command is run
 	# the radioSpeed variable is automatically changed when the radio buttons hit
 	# slow, radioSpeed = "slow"
-	# fast, radioSpeed = "fast"
-	global globalTimePWM	
+	# fast, radioSpeed = "fast"	
 	global currentSpeed
 	
-	radioVal = radioSpeed.get()
+	radioVal = radioSpeed.get() # "slow" or "fast"
 	
 	if radioVal == "slow":
 		currentSpeed = '1' 
@@ -170,14 +170,13 @@ def updateSpeed():
 	else:
 		currentSpeed = '1' # default to slowest speed
 	
-	globalTimePWM = time.time()
 	
 	outMsg = "Speed: " + str(radioVal)
 	writeTextReadOnly(outMsg, speedBox)
 	pyToSerial(currentSpeed) # send '1' or '2' to arduino
 	
+	
 def setDefaultsGUI():
-	global globalTimePWM
 	
 	# Set Radio Buttons
 	fastSpeedRadio.deselect()
@@ -204,7 +203,6 @@ def setDefaultsGUI():
 	manualModeRadio.configure(state = 'disable')
 	autoModeRadio.configure(state = 'disable')
 	
-	globalTimePWM = time.time()
 
 def updateProgMode():
 	global progMode
