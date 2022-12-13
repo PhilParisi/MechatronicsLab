@@ -3,15 +3,19 @@
 
 // 'z' --> null state (does nothing, holds current state)
 
-// States
+// Manual States
 byte state0Entry = false;  // 0 --> 'dead' (system off)
 byte state1Entry = false;  // 1 --> primed
 byte state2Entry = false;  // 2 --> turning left
 byte state3Entry = false;  // 3 --> turning right
 byte state4Entry = false;  // 4 --> drive forward
 byte state5Entry = false;  // 5 --> drive backward
-byte state6Entry = false;  // 6 --> emergency stop
-byte state7Entry = false;  // 7 --> autonomous mode
+
+// Autonomous States
+byte state10Entry = false; // 10 --> autonomous mode
+byte state11Entry = false; // 11 --> auto forward
+byte state12Entry = false; // 12 --> auto reverse
+byte state13Entry = false; // 13 --> auto turn
 
 
 // Immutable 'Variables'
@@ -26,7 +30,7 @@ byte state7Entry = false;  // 7 --> autonomous mode
 #define echoPin 11 // attach pin D2 Arduino to pin Echo of JSN-SR04T (PWM)
 #define trigPin 12 //attach pin D3 Arduino to pin Trig of JSN-SR04T
 
-#define slowMotorPWM 180  // these probably need adjustment based on what it takes to move the motors
+#define slowMotorPWM 200  // these probably need adjustment based on what it takes to move the motors
 #define fastMotorPWM 255
 
 #define serialCheckTimeInterval 50  // time in ms
@@ -43,12 +47,14 @@ byte returnToState; // state we want to go back to after turning
 long duration; // variable for the duration of sound wave travel
 long distance; // variable for the distance measurement
 
-char command = 'z';       // User command
+char command;       // User command
+char progMode;      // Current control state 'm' for manual ; 'a' for auto
 unsigned long startTime;  // Variable to record starting time
 
 float turnTime;
-float stateTime;
 float serialTime;
+float autoTimer;
+float backTime;
 long objectDistance;
 
 int sensorHitCounter; // for counting when the sensors records values that are 'too close'
@@ -64,6 +70,7 @@ void turnRight();
 void moveForward();
 void moveBackward();
 void objectAvoidance(int distance);
+//void inoToPython(int distance);
 
 // Setup Function
 void setup() {
@@ -78,30 +85,38 @@ void setup() {
 
   // H-Bridge Pin Setup
   pinMode(bridgeForwardRight, OUTPUT);
-  pinMode(bridgeBackwardRight, OUTPUT);
+  pinMode(bridgeBackwardRight, OUTPUT);     // HIGH and LOW values
   pinMode(bridgeForwardLeft, OUTPUT);
   pinMode(bridgeBackwardRight, OUTPUT);
-  pinMode(bridgePWM, OUTPUT);
-  motorSetSpeed(slowMotorPWM); // default to slow motor speed
+  pinMode(bridgePWM, OUTPUT);               // PWM for speed control
+
+  // H-Bridge Pin Initial Values [all low]
+  digitalWrite(bridgeForwardRight, LOW);
+  digitalWrite(bridgeBackwardRight, LOW);
+  digitalWrite(bridgeForwardLeft, LOW);
+  digitalWrite(bridgeBackwardLeft, LOW);
+  motorSetSpeed(slowMotorPWM); // sets bridgePWM pin to slowMotorPWM speed as default
   
   // Ultrasonic Sensor Setup
   pinMode(trigPin, OUTPUT); // Sets the trigPin as an OUTPUT
   pinMode(echoPin, INPUT); // Sets the echoPin as an INPUT
   Serial.begin(9600); // // Serial Communication is starting with 9600 of baud rate speed
 
-  // Serial Monitor Setup
-  //Serial.begin(38400);
+  // Control Flow Setup
+  char command = 'z';       // User command
+  char progMode = 'm';      // Current control state 'm' for manual ; 'a' for auto
+  nextState = 0;            // start in null 'dead' state
+
 }
 
 
 // Main Loop
 void loop() {
-  // Starting Parameters
-  stateTime = getTimeNow();   // for switching between tasks
+  
+  // Starting Timer for Serial Connection
   serialTime = getTimeNow();  // for serial check time interval
-  nextState = 0;              // Set the state at which the state transition diagram starts
-  int counter = 0;
 
+  // Infinite While Loop
   while (2 > 1)  // Start infinite loop
   {
 
@@ -119,7 +134,7 @@ void loop() {
   // Tasks for Every Loop
   controlTask(); //  Call ControlTask 1 (looks for commands of the letter format like 's' 'f' 'b')
   controlHbridgePWM(); // allow commands sent from GUI to update the PWM signal for hbridge (commands of the form '1' for slow and '2' for fast)
-  objectDistance = sensorPing();  // ultrasonic sensor sends pings, returns distance to nearest object [centimeters!]
+  //objectDistance = sensorPing();  // ultrasonic sensor sends pings, returns distance to nearest object [centimeters!]
   //objectAvoidance(objectDistance);
   
   // Reset command
@@ -188,6 +203,13 @@ void controlTask(void) {
         state1Entry = false;  
       }
 
+      if (command == 'a') // 'autonomous enable'
+      {
+        nextState = 10;
+        progMode = 'a';
+        state1Entry = false;
+      }
+
       break;
 
 
@@ -204,12 +226,14 @@ void controlTask(void) {
       {
         nextState = 1;        // get into state 1
         state2Entry = false;  // get out of state 2
+        turnTime = 0;
       }
 
       if ((getTimeNow() - turnTime) >= turnTimeInterval)  // we've been learning for long enough!
       {
         nextState = returnToState;      // go back to previous state
         state2Entry = false;            // get out of current state
+        turnTime = 0;
       }
 
       break;
@@ -224,14 +248,16 @@ void controlTask(void) {
 
       if (command == 's')  // stop
       {
-        nextState = 1;        // get into state 0
+        nextState = 1;        // 
         state3Entry = false;  // get out of state 2
+        turnTime = 0;
       }
 
       if ((getTimeNow() - turnTime) >= turnTimeInterval)  // we've been turning for long enough!
       {
         nextState = returnToState;      // go back to previous state
         state3Entry = false;            // get out of current state
+        turnTime = 0;
       }
 
       break;
@@ -309,8 +335,95 @@ void controlTask(void) {
       break;
 
 
-
+    case 10: // Autonomous Primed (countdown state before moving autonomously)
+      if  (state10Entry == false)
+      {
+        state10Entry = true;
+        autoTimer = getTimeNow();
+      }
       
+      if ((getTimeNow() - autoTimer) >= 3)
+      {
+        nextState = 11;
+        state10Entry = false;
+      }
+      
+      if (command == 's')
+      {
+        nextState = 1;
+        progMode = 'm';
+        state10Entry = false;
+      }
+
+      break;
+      
+    case 11: // Autonomous Forward
+      if (state11Entry == false)
+      {
+        state11Entry = true;
+        driveForward();
+      }
+      
+      if (command == 's')
+      {
+        nextState = 1;
+        progMode = 'm';
+        state11Entry = false;
+      }
+
+      // need to build bridge to state 12
+      break;
+      
+    case 12: // Autonomously Avoid Object by Backing Up
+      if (state12Entry == false)
+      {
+        state12Entry = true;
+        backTime = getTimeNow();
+        driveBackward();
+      }
+
+      if (command == 's')
+      {
+        nextState = 1;
+        state12Entry = false;
+        progMode = 'm';
+      }
+      
+      if ((getTimeNow() - backTime) >= 2) // back up for a certain period of time
+      {
+       stopMotors();
+       backTime = 0;
+       nextState = 13;
+       state12Entry = false; 
+      }
+
+      break;
+
+    case 13: // Autonomous Avoid Object by Backing Up 
+      if (state13Entry == false)
+      {
+        state13Entry = true;
+        turnLeft();
+        turnTime = getTimeNow();
+      }
+      
+      if ((getTimeNow() - turnTime) >= turnTimeInterval)
+      {
+        nextState = 11;
+        state12Entry = false;
+        turnTime = 0;
+        stopMotors();
+      }
+      
+      if (command == 's')
+      {
+        nextState = 1;
+        progMode = 'm';
+        state13Entry = false;
+        turnTime = 0;
+      }
+      break;
+
   }
 }
 
@@ -319,7 +432,6 @@ unsigned long getTimeNow(void)  // Returns time in ms units
 {
   return (millis());
 }
-
 
 void driveForward()
 {
@@ -425,8 +537,20 @@ void objectAvoidance(int distance)
   // send to 'stop' state 1 if we go above our max limit
   if (sensorHitCounter >= maxSensorHits)
   {
-    nextState = 1; // send program to 'stop' because we're too close!
-    sensorHitCounter = 0; 
+    if (progMode == 'm')
+    {
+      nextState = 1; // send program to 'stop' because we're too close!
+      sensorHitCounter = 0; 
+    }
+    if (progMode == 'a')
+    {
+      nextState = 12;
+      sensorHitCounter = 0;
+    }
   }
-
 }
+
+/*void inoToPython(int distance)
+{
+  Serial.write(distance);
+}*/

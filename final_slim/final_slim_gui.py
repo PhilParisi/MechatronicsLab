@@ -4,13 +4,12 @@
 
 ############### NOTES
 # Commands for Task 1
-	# d --> die (go back to initialize)
-	# i --> initialize (go to primed/stop state from dead state)
+	# i --> initialize
     # l --> left
     # r --> right
     # f --> forward
 	# b --> back/reverse
-    # s --> stop (go to primed/stop state)
+    # s --> stop
 	# a --> autonomous
     # z --> null
 
@@ -28,7 +27,7 @@ import time
 ############### SETUP
 
 # Arduino Setup
-arduino = serial.Serial(port='COM6', baudrate=9600, timeout=0.05)
+arduino = serial.Serial(port='COM3', baudrate=9600, timeout=0.05)
 valBytes = bytes('d','utf-8')       #Convert to bytes
 arduino.write(valBytes)
 
@@ -86,7 +85,7 @@ def stop():
 	
 	if progMode == "auto":
 		manualModeRadio.select()
-		#updateProgMode() maybe need to include this? hard to know
+		updateProgMode()
  
 def moveForward():
 	global commandChar
@@ -137,7 +136,7 @@ def turnLeft():
 
 def exitApp():
 	# Stop the Motor	
-	commandChar = 'd' # 'die' back to initialize
+	commandChar = 's'
 	pyToSerial(commandChar)
  
 	# Quit Application
@@ -222,10 +221,10 @@ def updateProgMode():
 	elif radioProgMode.get() == "auto":
 		if progMode == "manual":
 			writeTextReadOnly("Autonomous", motionBox)
-			commandChar = 'a'
+			
 		progMode = 'auto'
 		commandToGUI = 0
-		
+		commandChar = 'a'
 		
 	else:
 		progMode = 'manual'
@@ -237,7 +236,6 @@ def updateProgMode():
 	setAllGUIFeatures(commandToGUI)
 	modeMsg = "Mode: " + str(progMode)
 	writeTextReadOnly(modeMsg, progModeBox)
-	pyToSerial(commandChar)
 
 
 def setAllGUIFeatures(commandToGUI):
@@ -270,8 +268,6 @@ def runMainLoop():
 		# Update GUI Elements (replacement for main.mainloop() which blocks)
 		main.update_idletasks()
 		main.update()
-		#read_value = arduino.readline()
-		#print(read_value)
 		
 		
 		counter = counter + 1
