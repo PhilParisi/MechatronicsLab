@@ -27,7 +27,7 @@ import time
 ############### SETUP
 
 # Arduino Setup
-arduino = serial.Serial(port='COM3', baudrate=9600, timeout=0.05)
+arduino = serial.Serial(port='COM6', baudrate=9600, timeout=0.05)
 valBytes = bytes('d','utf-8')       #Convert to bytes
 arduino.write(valBytes)
 
@@ -326,9 +326,9 @@ slowSpeedRadio.grid(row = 3, column = 1, sticky = 'w')
 fastSpeedRadio.grid(row = 4, column = 1, sticky = 'w')
 
 # Mode
-selectModeLabel.grid(row = 6, column = 0, columnspan = 2, padx = 30)
-manualModeRadio.grid(row = 7, column = 1, sticky = 'w')
-autoModeRadio.grid(row = 8, column = 1, sticky = 'w')
+#selectModeLabel.grid(row = 6, column = 0, columnspan = 2, padx = 30)
+#manualModeRadio.grid(row = 7, column = 1, sticky = 'w')
+#autoModeRadio.grid(row = 8, column = 1, sticky = 'w')
 
 # Manual Control
 manualControlLabel.grid(row = 2, column = 2, columnspan = 2, padx = 30)

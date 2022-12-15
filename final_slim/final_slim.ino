@@ -126,8 +126,6 @@ void loop() {
   // Tasks for Every Loop
   controlTask(); //  Call ControlTask 1 (looks for commands of the letter format like 's' 'f' 'b')
   controlHbridgePWM(); // allow commands sent from GUI to update the PWM signal for hbridge (commands of the form '1' for slow and '2' for fast)
-  //objectDistance = sensorPing(); // ping with ultrasonic sensor
-  //objectAvoidance(objectDistance); // avoid objects
 
   // Reset command
   command = 'z';   // reset this so commands are executed only once
@@ -274,7 +272,7 @@ void controlTask(void) {
 
       if (state4Entry == true) // do this every loop when we're in the state
       {
-       sensorPing(); // ping with ultrasonic sensor
+        sensorPing(); // ping with ultrasonic sensor
       }
 
       if (command == 's')   // stop
@@ -464,7 +462,7 @@ void sensorPing() // function from Sensor Machine
       distance = duration * 0.0343 / 2;
       sensorTimerOn = false;
       objectAvoidance(distance);
-      distance = 0; // reset distance
+      distance = 1000; // reset distance
     }
   }
 
